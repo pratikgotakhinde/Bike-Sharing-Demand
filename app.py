@@ -11,47 +11,87 @@ st.set_page_config(
     page_icon="🚲"
 )
 
-# ---------- GLOBAL STYLE (CSS) ----------
+# ---------- GLOBAL THEME & CSS (BIKE STYLE) ----------
 st.markdown("""
 <style>
-/* Global background */
+/* Dark asphalt background, bike-green accent */
 .stApp {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background: radial-gradient(circle at top left, #222831 0%, #0f141a 40%, #000000 100%);
+    color: #f5f5f5;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Main container padding */
+/* Main content container */
 .block-container {
     padding-top: 1rem;
 }
 
 /* Titles */
 h1, h2, h3 {
-    font-family: "Helvetica Neue", sans-serif;
-    color: #1f3c88;
+    font-family: "Poppins", "Inter", sans-serif;
+    color: #e8f9fd;
 }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background-color: #ffffffdd;
+    background: rgba(10, 16, 24, 0.95);
+    border-right: 1px solid #1f2933;
 }
 
 /* Card look */
 .card {
-    background-color: #ffffff;
-    padding: 15px 25px;
-    border-radius: 15px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    background: linear-gradient(135deg, #111827, #020617);
+    padding: 16px 24px;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(148, 163, 184, 0.3);
     margin-bottom: 1rem;
 }
 
 /* Metrics */
 [data-testid="stMetricValue"] {
-    color: #1f3c88;
+    color: #4ade80;  /* bike green */
+    font-weight: 600;
 }
 
-/* Make sliders and buttons a bit rounded */
-.stButton>button, .stSlider>div>div>div {
-    border-radius: 10px;
+/* Widgets accent (buttons/sliders) */
+.stButton>button {
+    border-radius: 999px;
+    background: linear-gradient(90deg, #22c55e, #a3e635);
+    color: #020617;
+    border: none;
+    font-weight: 600;
+}
+.stButton>button:hover {
+    filter: brightness(1.05);
+}
+.stSlider>div>div>div {
+    border-radius: 999px;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent;
+}
+.stTabs [data-baseweb="tab"] p {
+    font-weight: 500;
+}
+
+/* Popover button for charts */
+.chart-pop-btn {
+    background: none;
+    border: none;
+    color: #38bdf8;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+}
+
+/* Small caption under charts */
+.chart-caption {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-top: -6px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -59,12 +99,12 @@ h1, h2, h3 {
 # ---------- HEADER ----------
 st.markdown("""
 <h1 style='text-align:center; margin-bottom:0;'>
-    Bike Sharing Demand Dashboard
+    🚲 Bike Sharing Demand Dashboard
 </h1>
-<p style='text-align:center; color:#555; font-size:0.95rem;'>
-    Interactive exploration of how time, weather and season shape bike rental patterns.
+<p style='text-align:center; color:#9ca3af; font-size:0.95rem;'>
+    Explore how time, season and weather shape bike rental behaviour in Washington, D.C.
 </p>
-<hr>
+<hr style="border-color:#1f2933;">
 """, unsafe_allow_html=True)
 
 # ---------- DATA LOADING ----------
@@ -177,6 +217,16 @@ with st.container():
 # ---------- TABS ----------
 tab1, tab2, tab3 = st.tabs(["Time patterns", "Season & Weather", "Correlations"])
 
+# Helper to render chart + popover
+def chart_with_popover(fig, title: str, btn_key: str):
+    col_main, col_btn = st.columns([8, 1])
+    with col_main:
+        st.pyplot(fig)
+    with col_btn:
+        with st.popover("🔍 Enlarge", use_container_width=True):
+            st.markdown(f"**{title}**", unsafe_allow_html=True)
+            st.pyplot(fig)
+
 # ----- TAB 1: TIME PATTERNS -----
 with tab1:
     with st.container():
@@ -195,12 +245,13 @@ with tab1:
                 ci=95,
                 marker="o",
                 ax=ax,
-                color="#2e86de"
+                color="#22c55e"
             )
             ax.set_xlabel("Hour of day")
             ax.set_ylabel("Mean rentals")
-            ax.grid(alpha=0.3)
-            st.pyplot(fig)
+            ax.grid(alpha=0.25)
+            chart_with_popover(fig, "Mean rentals by hour", "hour_pop")
+            st.markdown("<p class='chart-caption'>Typical commuter peaks around morning and evening hours.</p>", unsafe_allow_html=True)
 
         with col2:
             st.subheader("Mean rentals by period of day")
@@ -213,31 +264,36 @@ with tab1:
                 estimator=np.mean,
                 ci=95,
                 order=order,
-                palette="Blues"
+                palette="Greens"
             )
             ax2.set_xlabel("Period of day")
             ax2.set_ylabel("Mean rentals")
-            st.pyplot(fig2)
-
-        st.subheader("Hourly rentals by day of week")
-        fig3, ax3 = plt.subplots(figsize=(10, 4))
-        sns.lineplot(
-            data=df_filtered,
-            x="hour",
-            y=target_col,
-            hue="day_of_week",
-            estimator=np.mean,
-            ci=None,
-            marker="o",
-            ax=ax3
-        )
-        ax3.set_xlabel("Hour")
-        ax3.set_ylabel("Mean rentals")
-        ax3.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-        ax3.grid(alpha=0.3)
-        st.pyplot(fig3)
+            chart_with_popover(fig2, "Mean rentals by period of day", "period_pop")
+            st.markdown("<p class='chart-caption'>Evening and morning windows highlight strong rush-hour usage.</p>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+        with st.container():
+            st.markdown("<div class='card'>", unsafe_allow_html=True)
+            st.subheader("Hourly rentals by day of week")
+            fig3, ax3 = plt.subplots(figsize=(10, 4))
+            sns.lineplot(
+                data=df_filtered,
+                x="hour",
+                y=target_col,
+                hue="day_of_week",
+                estimator=np.mean,
+                ci=None,
+                marker="o",
+                ax=ax3
+            )
+            ax3.set_xlabel("Hour")
+            ax3.set_ylabel("Mean rentals")
+            ax3.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+            ax3.grid(alpha=0.25)
+            chart_with_popover(fig3, "Hourly rentals by day of week", "dow_pop")
+            st.markdown("<p class='chart-caption'>Compare workdays vs weekend profiles to see commuting effects.</p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
 # ----- TAB 2: SEASON & WEATHER -----
 with tab2:
@@ -255,12 +311,13 @@ with tab2:
                 y=target_col,
                 estimator=np.mean,
                 ci=95,
-                palette="coolwarm",
+                palette="YlGn",
                 ax=ax4
             )
             ax4.set_xlabel("Season")
             ax4.set_ylabel("Mean rentals")
-            st.pyplot(fig4)
+            chart_with_popover(fig4, "Mean rentals by season", "season_pop")
+            st.markdown("<p class='chart-caption'>Warm seasons boost usage; winter typically shows a drop.</p>", unsafe_allow_html=True)
 
         with col5:
             st.subheader("Mean rentals by weather")
@@ -271,12 +328,13 @@ with tab2:
                 y=target_col,
                 estimator=np.mean,
                 ci=95,
-                palette="viridis",
+                palette="GnBu",
                 ax=ax5
             )
             ax5.set_xlabel("Weather category")
             ax5.set_ylabel("Mean rentals")
-            st.pyplot(fig5)
+            chart_with_popover(fig5, "Mean rentals by weather", "weather_pop")
+            st.markdown("<p class='chart-caption'>Clear days drive more rides; harsh conditions dampen demand.</p>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -290,8 +348,9 @@ with tab3:
         if len(num_cols) > 1 and not df_filtered.empty:
             corr = df_filtered[num_cols].corr()
             fig6, ax6 = plt.subplots(figsize=(8, 5))
-            sns.heatmap(corr, annot=False, cmap="RdBu_r", ax=ax6)
-            st.pyplot(fig6)
+            sns.heatmap(corr, annot=False, cmap="rocket_r", ax=ax6)
+            chart_with_popover(fig6, "Correlation heatmap", "corr_pop")
+            st.markdown("<p class='chart-caption'>Check how temperature, humidity and other factors move with demand.</p>", unsafe_allow_html=True)
         else:
             st.info("Not enough numeric data after filtering to compute correlations.")
 
