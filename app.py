@@ -4,23 +4,68 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# ---------- PAGE CONFIG & STYLE ----------
-st.set_page_config(page_title="Bike Sharing Demand Dashboard",
-                   layout="wide",
-                   page_icon="🚲")
-
-st.markdown(
-    """
-    <h1 style='text-align:center; color:#2e86de;'>
-        Bike Sharing Demand Dashboard
-    </h1>
-    <p style='text-align:center; color:#555555;'>
-        Explore how time, weather and season affect bike rentals.
-    </p>
-    <hr>
-    """,
-    unsafe_allow_html=True,
+# ---------- PAGE CONFIG ----------
+st.set_page_config(
+    page_title="Bike Sharing Demand Dashboard",
+    layout="wide",
+    page_icon="🚲"
 )
+
+# ---------- GLOBAL STYLE (CSS) ----------
+st.markdown("""
+<style>
+/* Global background */
+.stApp {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+/* Main container padding */
+.block-container {
+    padding-top: 1rem;
+}
+
+/* Titles */
+h1, h2, h3 {
+    font-family: "Helvetica Neue", sans-serif;
+    color: #1f3c88;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #ffffffdd;
+}
+
+/* Card look */
+.card {
+    background-color: #ffffff;
+    padding: 15px 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    margin-bottom: 1rem;
+}
+
+/* Metrics */
+[data-testid="stMetricValue"] {
+    color: #1f3c88;
+}
+
+/* Make sliders and buttons a bit rounded */
+.stButton>button, .stSlider>div>div>div {
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------- HEADER ----------
+st.markdown("""
+<h1 style='text-align:center; margin-bottom:0;'>
+    Bike Sharing Demand Dashboard
+</h1>
+<p style='text-align:center; color:#555; font-size:0.95rem;'>
+    Interactive exploration of how time, weather and season shape bike rental patterns.
+</p>
+<hr>
+""", unsafe_allow_html=True)
 
 # ---------- DATA LOADING ----------
 @st.cache_data
@@ -81,7 +126,10 @@ min_hour, max_hour = st.sidebar.slider(
     0, 23, (0, 23)
 )
 
-use_registered = st.sidebar.checkbox("Show registered users instead of total count", value=False)
+use_registered = st.sidebar.checkbox(
+    "Show registered users instead of total count",
+    value=False
+)
 
 # ---------- APPLY FILTERS ----------
 df_filtered = df.copy()
@@ -99,131 +147,152 @@ if wd_val is not None:
 
 target_col = "registered" if use_registered else "count"
 
-# ---------- KPI METRICS ----------
-col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+# ---------- KPI METRICS (CARD) ----------
+with st.container():
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-with col_kpi1:
-    st.metric("Total rides (filtered)",
-              f"{df_filtered[target_col].sum():,.0f}")
+    col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
 
-with col_kpi2:
-    st.metric("Average rides per hour",
-              f"{df_filtered[target_col].mean():.1f}")
+    with col_kpi1:
+        st.metric(
+            "Total rides (filtered)",
+            f"{df_filtered[target_col].sum():,.0f}"
+        )
 
-with col_kpi3:
-    peak_hour = (
-        df_filtered.groupby("hour")[target_col].mean()
-        .idxmax()
-        if not df_filtered.empty else "-"
-    )
-    st.metric("Peak hour (filtered)", f"{peak_hour}")
+    with col_kpi2:
+        st.metric(
+            "Average rides per hour",
+            f"{df_filtered[target_col].mean():.1f}"
+        )
 
-st.write("")
+    with col_kpi3:
+        if not df_filtered.empty:
+            peak_hour = df_filtered.groupby("hour")[target_col].mean().idxmax()
+        else:
+            peak_hour = "-"
+        st.metric("Peak hour (filtered)", f"{peak_hour}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------- TABS ----------
 tab1, tab2, tab3 = st.tabs(["Time patterns", "Season & Weather", "Correlations"])
 
 # ----- TAB 1: TIME PATTERNS -----
 with tab1:
-    col1, col2 = st.columns(2)
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-    with col1:
-        st.subheader("Mean rentals by hour")
-        fig, ax = plt.subplots()
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Mean rentals by hour")
+            fig, ax = plt.subplots()
+            sns.lineplot(
+                data=df_filtered,
+                x="hour",
+                y=target_col,
+                estimator=np.mean,
+                ci=95,
+                marker="o",
+                ax=ax,
+                color="#2e86de"
+            )
+            ax.set_xlabel("Hour of day")
+            ax.set_ylabel("Mean rentals")
+            ax.grid(alpha=0.3)
+            st.pyplot(fig)
+
+        with col2:
+            st.subheader("Mean rentals by period of day")
+            fig2, ax2 = plt.subplots()
+            order = ["night", "morning", "afternoon", "evening"]
+            sns.barplot(
+                data=df_filtered,
+                x="day_period",
+                y=target_col,
+                estimator=np.mean,
+                ci=95,
+                order=order,
+                palette="Blues"
+            )
+            ax2.set_xlabel("Period of day")
+            ax2.set_ylabel("Mean rentals")
+            st.pyplot(fig2)
+
+        st.subheader("Hourly rentals by day of week")
+        fig3, ax3 = plt.subplots(figsize=(10, 4))
         sns.lineplot(
             data=df_filtered,
             x="hour",
             y=target_col,
+            hue="day_of_week",
             estimator=np.mean,
-            ci=95,
+            ci=None,
             marker="o",
-            ax=ax,
-            color="#2e86de"
+            ax=ax3
         )
-        ax.set_xlabel("Hour of day")
-        ax.set_ylabel("Mean rentals")
-        ax.grid(alpha=0.3)
-        st.pyplot(fig)
+        ax3.set_xlabel("Hour")
+        ax3.set_ylabel("Mean rentals")
+        ax3.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+        ax3.grid(alpha=0.3)
+        st.pyplot(fig3)
 
-    with col2:
-        st.subheader("Mean rentals by period of day")
-        fig2, ax2 = plt.subplots()
-        order = ["night", "morning", "afternoon", "evening"]
-        sns.barplot(
-            data=df_filtered,
-            x="day_period",
-            y=target_col,
-            estimator=np.mean,
-            ci=95,
-            order=order,
-            palette="Blues"
-        )
-        ax2.set_xlabel("Period of day")
-        ax2.set_ylabel("Mean rentals")
-        st.pyplot(fig2)
-
-    st.subheader("Hourly rentals by day of week")
-    fig3, ax3 = plt.subplots(figsize=(10, 4))
-    sns.lineplot(
-        data=df_filtered,
-        x="hour",
-        y=target_col,
-        hue="day_of_week",
-        estimator=np.mean,
-        ci=None,
-        marker="o",
-        ax=ax3
-    )
-    ax3.set_xlabel("Hour")
-    ax3.set_ylabel("Mean rentals")
-    ax3.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
-    ax3.grid(alpha=0.3)
-    st.pyplot(fig3)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ----- TAB 2: SEASON & WEATHER -----
 with tab2:
-    col4, col5 = st.columns(2)
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-    with col4:
-        st.subheader("Mean rentals by season")
-        fig4, ax4 = plt.subplots()
-        sns.barplot(
-            data=df_filtered,
-            x="season_name",
-            y=target_col,
-            estimator=np.mean,
-            ci=95,
-            palette="coolwarm",
-            ax=ax4
-        )
-        ax4.set_xlabel("Season")
-        ax4.set_ylabel("Mean rentals")
-        st.pyplot(fig4)
+        col4, col5 = st.columns(2)
 
-    with col5:
-        st.subheader("Mean rentals by weather")
-        fig5, ax5 = plt.subplots()
-        sns.barplot(
-            data=df_filtered,
-            x="weather",
-            y=target_col,
-            estimator=np.mean,
-            ci=95,
-            palette="viridis",
-            ax=ax5
-        )
-        ax5.set_xlabel("Weather category")
-        ax5.set_ylabel("Mean rentals")
-        st.pyplot(fig5)
+        with col4:
+            st.subheader("Mean rentals by season")
+            fig4, ax4 = plt.subplots()
+            sns.barplot(
+                data=df_filtered,
+                x="season_name",
+                y=target_col,
+                estimator=np.mean,
+                ci=95,
+                palette="coolwarm",
+                ax=ax4
+            )
+            ax4.set_xlabel("Season")
+            ax4.set_ylabel("Mean rentals")
+            st.pyplot(fig4)
+
+        with col5:
+            st.subheader("Mean rentals by weather")
+            fig5, ax5 = plt.subplots()
+            sns.barplot(
+                data=df_filtered,
+                x="weather",
+                y=target_col,
+                estimator=np.mean,
+                ci=95,
+                palette="viridis",
+                ax=ax5
+            )
+            ax5.set_xlabel("Weather category")
+            ax5.set_ylabel("Mean rentals")
+            st.pyplot(fig5)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ----- TAB 3: CORRELATIONS -----
 with tab3:
-    st.subheader("Correlation heatmap (numeric features)")
-    num_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns
-    if len(num_cols) > 1:
-        corr = df_filtered[num_cols].corr()
-        fig6, ax6 = plt.subplots(figsize=(8, 5))
-        sns.heatmap(corr, annot=False, cmap="RdBu_r", ax=ax6)
-        st.pyplot(fig6)
-    else:
-        st.info("Not enough numeric columns after filtering to compute correlations.")
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+        st.subheader("Correlation heatmap (numeric features)")
+        num_cols = df_filtered.select_dtypes(include=["int64", "float64"]).columns
+        if len(num_cols) > 1 and not df_filtered.empty:
+            corr = df_filtered[num_cols].corr()
+            fig6, ax6 = plt.subplots(figsize=(8, 5))
+            sns.heatmap(corr, annot=False, cmap="RdBu_r", ax=ax6)
+            st.pyplot(fig6)
+        else:
+            st.info("Not enough numeric data after filtering to compute correlations.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
