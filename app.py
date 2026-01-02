@@ -77,14 +77,31 @@ h1, h2, h3 {
     font-weight: 500;
 }
 
-/* Popover button for charts */
+/* Icon-only enlarge button for charts */
 .chart-pop-btn {
-    background: none;
-    border: none;
-    color: #38bdf8;
+    background: radial-gradient(circle at 30% 30%, #38bdf8 0%, #0369a1 40%, #020617 100%);
+    border-radius: 999px;
+    border: 1px solid #38bdf880;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    font-size: 0.85rem;
+    box-shadow: 0 8px 20px rgba(56, 189, 248, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    color: #e5faff;
+    font-size: 18px;
     padding: 0;
+}
+.chart-pop-btn:hover {
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 12px 26px rgba(56, 189, 248, 0.55);
+    filter: brightness(1.08);
+}
+.chart-pop-btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
 }
 
 /* Small caption under charts */
@@ -151,8 +168,8 @@ season_opt = st.sidebar.multiselect(
 
 weather_opt = st.sidebar.multiselect(
     "Weather category",
-    options=sorted(df["weather"].unique()),
-    default=sorted(df["weather"].unique())
+    options=sorted(df["weather"].dropna().unique()),
+    default=sorted(df["weather"].dropna().unique())
 )
 
 workingday_map = {"Both": None, "Working days only": 1, "Non-working days only": 0}
@@ -166,10 +183,12 @@ min_hour, max_hour = st.sidebar.slider(
     0, 23, (0, 23)
 )
 
-use_registered = st.sidebar.checkbox(
-    "Show registered users instead of total count",
-    value=False
+# Total vs Registered selector
+target_choice = st.sidebar.selectbox(
+    "Show",
+    ["Total rentals", "Registered users"]
 )
+target_col = "registered" if target_choice == "Registered users" else "count"
 
 # ---------- APPLY FILTERS ----------
 df_filtered = df.copy()
@@ -185,8 +204,6 @@ wd_val = workingday_map[workingday_label]
 if wd_val is not None:
     df_filtered = df_filtered[df_filtered["workingday"] == wd_val]
 
-target_col = "registered" if use_registered else "count"
-
 # ---------- KPI METRICS (CARD) ----------
 with st.container():
     st.markdown("<div class='card'>", unsafe_allow_html=True)
@@ -195,13 +212,13 @@ with st.container():
 
     with col_kpi1:
         st.metric(
-            "Total rides (filtered)",
+            f"Total {target_choice.lower()} (filtered)",
             f"{df_filtered[target_col].sum():,.0f}"
         )
 
     with col_kpi2:
         st.metric(
-            "Average rides per hour",
+            f"Average {target_choice.lower()} per hour",
             f"{df_filtered[target_col].mean():.1f}"
         )
 
@@ -217,15 +234,38 @@ with st.container():
 # ---------- TABS ----------
 tab1, tab2, tab3 = st.tabs(["Time patterns", "Season & Weather", "Correlations"])
 
-# Helper to render chart + popover
+# Helper to render chart + icon-only popover
 def chart_with_popover(fig, title: str, btn_key: str):
     col_main, col_btn = st.columns([8, 1])
     with col_main:
         st.pyplot(fig)
     with col_btn:
-        with st.popover("🔍 Enlarge", use_container_width=True):
-            st.markdown(f"**{title}**", unsafe_allow_html=True)
+        # invisible popover trigger
+        with st.popover("", use_container_width=True, key=f"pop_{btn_key}"):
+            st.markdown(f"### {title}", unsafe_allow_html=True)
             st.pyplot(fig)
+
+        # override popover button style and show custom icon
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stPopoverButton"][data-baseweb="button"] {
+                background: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div class="chart-pop-btn">
+                ⤢
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # ----- TAB 1: TIME PATTERNS -----
 with tab1:
@@ -251,7 +291,10 @@ with tab1:
             ax.set_ylabel("Mean rentals")
             ax.grid(alpha=0.25)
             chart_with_popover(fig, "Mean rentals by hour", "hour_pop")
-            st.markdown("<p class='chart-caption'>Typical commuter peaks around morning and evening hours.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Typical commuter peaks around morning and evening hours.</p>",
+                unsafe_allow_html=True
+            )
 
         with col2:
             st.subheader("Mean rentals by period of day")
@@ -269,7 +312,10 @@ with tab1:
             ax2.set_xlabel("Period of day")
             ax2.set_ylabel("Mean rentals")
             chart_with_popover(fig2, "Mean rentals by period of day", "period_pop")
-            st.markdown("<p class='chart-caption'>Evening and morning windows highlight strong rush-hour usage.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Evening and morning windows highlight strong rush-hour usage.</p>",
+                unsafe_allow_html=True
+            )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -292,7 +338,10 @@ with tab1:
             ax3.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
             ax3.grid(alpha=0.25)
             chart_with_popover(fig3, "Hourly rentals by day of week", "dow_pop")
-            st.markdown("<p class='chart-caption'>Compare workdays vs weekend profiles to see commuting effects.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Compare workdays vs weekend profiles to see commuting effects.</p>",
+                unsafe_allow_html=True
+            )
             st.markdown("</div>", unsafe_allow_html=True)
 
 # ----- TAB 2: SEASON & WEATHER -----
@@ -317,7 +366,10 @@ with tab2:
             ax4.set_xlabel("Season")
             ax4.set_ylabel("Mean rentals")
             chart_with_popover(fig4, "Mean rentals by season", "season_pop")
-            st.markdown("<p class='chart-caption'>Warm seasons boost usage; winter typically shows a drop.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Warm seasons boost usage; winter typically shows a drop.</p>",
+                unsafe_allow_html=True
+            )
 
         with col5:
             st.subheader("Mean rentals by weather")
@@ -334,7 +386,10 @@ with tab2:
             ax5.set_xlabel("Weather category")
             ax5.set_ylabel("Mean rentals")
             chart_with_popover(fig5, "Mean rentals by weather", "weather_pop")
-            st.markdown("<p class='chart-caption'>Clear days drive more rides; harsh conditions dampen demand.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Clear days drive more rides; harsh conditions dampen demand.</p>",
+                unsafe_allow_html=True
+            )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -350,7 +405,10 @@ with tab3:
             fig6, ax6 = plt.subplots(figsize=(8, 5))
             sns.heatmap(corr, annot=False, cmap="rocket_r", ax=ax6)
             chart_with_popover(fig6, "Correlation heatmap", "corr_pop")
-            st.markdown("<p class='chart-caption'>Check how temperature, humidity and other factors move with demand.</p>", unsafe_allow_html=True)
+            st.markdown(
+                "<p class='chart-caption'>Check how temperature, humidity and other factors move with demand.</p>",
+                unsafe_allow_html=True
+            )
         else:
             st.info("Not enough numeric data after filtering to compute correlations.")
 
